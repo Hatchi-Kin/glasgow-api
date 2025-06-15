@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # ← Add this line for manual trigger
 
 env:
   DOCKER_IMAGE: hatchikin/glasgow-fastapi
