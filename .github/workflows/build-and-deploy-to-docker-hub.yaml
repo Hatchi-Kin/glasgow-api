@@ -9,6 +9,7 @@ on:
 
 env:
   DOCKER_IMAGE: hatchikin/glasgow-fastapi
+  REGISTRY: docker.io
 
 jobs:
   build-and-push:
@@ -48,6 +49,7 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
+        provenance: false
+        
     - name: Image digest
       run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
