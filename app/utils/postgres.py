@@ -11,9 +11,14 @@ def get_postgres_connection():
     """Context manager for PostgreSQL connections."""
     conn = None
     try:
-        conn = psycopg2.connect(
-            os.getenv("DATABASE_URL"), cursor_factory=RealDictCursor
-        )
+        # Build the connection string from environment variables
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+        host = os.getenv("POSTGRES_HOST")
+        port = os.getenv("POSTGRES_PORT", "5432")
+        db = os.getenv("POSTGRES_DB")
+        dsn = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        conn = psycopg2.connect(dsn, cursor_factory=RealDictCursor)
         yield conn
     except Exception as e:
         raise RuntimeError(f"Failed to create PostgreSQL connection: {str(e)}")
