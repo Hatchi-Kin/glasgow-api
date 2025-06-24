@@ -32,7 +32,11 @@ def setup_music_db():
     tracks = [
         ("The Boy in the Bubble", "Paul Simon / Paul Simon - Forere Motlhoheloa", 1),
         ("Graceland", "Paul Simon", 2),
-        ("I Know What I Know", "Paul Simon / Paul Simon - General Mikhatshani Daniel Shirinda", 3),
+        (
+            "I Know What I Know",
+            "Paul Simon / Paul Simon - General Mikhatshani Daniel Shirinda",
+            3,
+        ),
         ("Gumboots", "Paul Simon / Paul Simon - Lulu Masilela - Johnson Mkhalali", 4),
         ("Diamonds on the Soles of Her Shoes", "Paul Simon - Joseph Shabalala", 5),
         ("You Can Call Me Al", "Paul Simon", 6),
@@ -47,7 +51,8 @@ def setup_music_db():
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
                 # Create table
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS music (
                         id SERIAL PRIMARY KEY,
                         title VARCHAR(255) NOT NULL,
@@ -56,22 +61,26 @@ def setup_music_db():
                         track_number INTEGER,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
-                """)
-                
+                """
+                )
+
                 # Clear existing Graceland data
                 cursor.execute("DELETE FROM music WHERE album = 'Graceland';")
-                
+
                 # Insert tracks
-                cursor.executemany("""
+                cursor.executemany(
+                    """
                     INSERT INTO music (title, artist, track_number)
                     VALUES (%s, %s, %s);
-                """, tracks)
-                
+                """,
+                    tracks,
+                )
+
                 conn.commit()
-                
+
                 return {
                     "status": "success",
-                    "message": f"Music table created and populated with {len(tracks)} Graceland tracks"
+                    "message": f"Music table created and populated with {len(tracks)} Graceland tracks",
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -87,8 +96,28 @@ def query_music():
                 return {
                     "status": "success",
                     "count": len(rows),
-                    "tracks": [dict(row) for row in rows]
+                    "tracks": [dict(row) for row in rows],
                 }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def list_all_dbs_from_postgres():
+    """List all databases in the PostgreSQL instance."""
+    try:
+        # Connect to the 'postgres' default database to list all DBs
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+        host = os.getenv("POSTGRES_HOST")
+        port = os.getenv("POSTGRES_PORT", "5432")
+        dsn = f"postgresql://{user}:{password}@{host}:{port}/postgres"
+        with psycopg2.connect(dsn, cursor_factory=RealDictCursor) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT datname FROM pg_database WHERE datistemplate = false;"
+                )
+                dbs = cursor.fetchall()
+                return {"status": "success", "databases": [db["datname"] for db in dbs]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
