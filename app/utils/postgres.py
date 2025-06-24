@@ -122,6 +122,34 @@ def list_all_dbs_from_postgres():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def list_tables_in_db(db_name: str):
+    """List all tables in the specified PostgreSQL database."""
+    try:
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+        host = os.getenv("POSTGRES_HOST")
+        port = os.getenv("POSTGRES_PORT", "5432")
+        dsn = f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+        with psycopg2.connect(dsn, cursor_factory=RealDictCursor) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                    ORDER BY table_name;
+                """
+                )
+                tables = cursor.fetchall()
+                return {
+                    "status": "success",
+                    "database": db_name,
+                    "tables": [t["table_name"] for t in tables],
+                }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def health_check():
     """Simple health check for database connection."""
     try:

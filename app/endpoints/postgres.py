@@ -5,6 +5,7 @@ from app.utils.postgres import (
     query_music,
     health_check,
     list_all_dbs_from_postgres,
+    list_tables_in_db,
 )
 
 
@@ -29,3 +30,8 @@ def get_music():
 @router.get("/databases")
 def get_databases():
     return list_all_dbs_from_postgres()
+
+
+@router.get("/tables/{db_name}")
+def get_tables(db_name: str):
+    return list_tables_in_db(db_name)
