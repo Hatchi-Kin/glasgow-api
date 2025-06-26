@@ -6,6 +6,7 @@ from app.utils.postgres import (
     health_check,
     list_all_dbs_from_postgres,
     list_tables_in_db,
+    create_n8n_db,
 )
 
 
@@ -20,6 +21,11 @@ def check_health():
 @router.get("/setup_music")
 def setup():
     return setup_music_db()
+
+
+@router.get("/setup_n8n")
+def setup_n8n():
+    return create_n8n_db()
 
 
 @router.get("/music")
