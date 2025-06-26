@@ -7,7 +7,7 @@ from psycopg2.extras import RealDictCursor
 
 
 @contextmanager
-def get_postgres_connection():
+def get_postgres_connection(db_name=None):
     """Context manager for PostgreSQL connections."""
     conn = None
     try:
