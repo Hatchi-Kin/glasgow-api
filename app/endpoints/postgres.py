@@ -23,11 +23,6 @@ def setup():
     return setup_music_db()
 
 
-@router.get("/setup_n8n")
-def setup_n8n():
-    return create_n8n_db()
-
-
 @router.get("/music")
 def get_music():
     return query_music()

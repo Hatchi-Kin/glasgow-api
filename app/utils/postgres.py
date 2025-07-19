@@ -27,21 +27,6 @@ def get_postgres_connection(db_name=None):
             conn.close()
 
 
-def create_n8n_db():
-    """Create a database named 'n8n' if it does not exist."""
-    try:
-        with get_postgres_connection(db_name="postgres") as conn:
-            conn.autocommit = True
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1 FROM pg_database WHERE datname = 'n8n';")
-                if cursor.fetchone():
-                    return {"status": "exists", "message": "Database 'n8n' already exists"}
-                cursor.execute('CREATE DATABASE "n8n";')
-                return {"status": "success", "message": "Database 'n8n' created"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 def setup_music_db():
     """Create music table and fill it with Graceland tracks in one go."""
     tracks = [
