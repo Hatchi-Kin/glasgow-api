@@ -6,7 +6,6 @@ from app.utils.postgres import (
     health_check,
     list_all_dbs_from_postgres,
     list_tables_in_db,
-    create_n8n_db,
 )
 
 
