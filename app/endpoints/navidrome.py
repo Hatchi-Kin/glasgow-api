@@ -1,6 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Query
 from typing import Optional
+
+from fastapi import APIRouter, UploadFile, File, Query
+
 from app.utils.navidrome import add_music_file, remove_music_file, list_music_files
+
 
 router = APIRouter(prefix="/navidrome", tags=["navidrome"])
 
