@@ -1,6 +1,13 @@
 from fastapi import APIRouter
 
-from app.utils.postgres import (
+from app.models.common import StatusResponse
+from app.models.postgres import (
+    MusicResponse,
+    PostgresHealthResponse,
+    DatabaseListResponse,
+    TableListResponse,
+)
+from app.services.postgres.service import (
     setup_music_db,
     query_music,
     health_check,
@@ -12,26 +19,26 @@ from app.utils.postgres import (
 router = APIRouter(prefix="/postgresql", tags=["PostgreSQL"])
 
 
-@router.get("/health")
+@router.get("/health", response_model=PostgresHealthResponse)
 def check_health():
     return health_check()
 
 
-@router.get("/setup_music")
+@router.get("/setup_music", response_model=StatusResponse)
 def setup():
     return setup_music_db()
 
 
-@router.get("/music")
+@router.get("/music", response_model=MusicResponse)
 def get_music():
     return query_music()
 
 
-@router.get("/databases")
+@router.get("/databases", response_model=DatabaseListResponse)
 def get_databases():
     return list_all_dbs_from_postgres()
 
 
-@router.get("/tables/{db_name}")
+@router.get("/tables/{db_name}", response_model=TableListResponse)
 def get_tables(db_name: str):
     return list_tables_in_db(db_name)

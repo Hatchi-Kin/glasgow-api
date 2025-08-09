@@ -2,19 +2,17 @@ import os
 from pathlib import Path
 from typing import Optional
 import aiofiles
-import logging
 
 from fastapi import HTTPException, UploadFile
 
-logger = logging.getLogger(__name__)
+from app.core.config import settings
+from app.core.logging import get_logger
 
-# Configuration
-MUSIC_FOLDER_PATH = "/music"
-ALLOWED_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.aac'}
+logger = get_logger("navidrome")
 
 def _get_music_folder() -> Path:
     """Get and validate the music folder path"""
-    music_folder = Path(MUSIC_FOLDER_PATH)
+    music_folder = Path(settings.music_folder_path)
     
     try:
         music_folder.mkdir(parents=True, exist_ok=True)
@@ -41,10 +39,10 @@ async def add_music_file(file: UploadFile, subfolder: Optional[str] = None) -> d
         
         # Validate file type
         file_extension = Path(file.filename).suffix.lower()
-        if file_extension not in ALLOWED_EXTENSIONS:
+        if file_extension not in settings.allowed_music_extensions:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Unsupported file type: {file_extension}. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+                detail=f"Unsupported file type: {file_extension}. Allowed: {', '.join(settings.allowed_music_extensions)}"
             )
         
         # Determine target path

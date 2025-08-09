@@ -1,17 +1,21 @@
-import os
-
 from minio import Minio
 from minio.error import S3Error
 from fastapi import HTTPException
 
+from app.core.config import settings
+from app.core.logging import get_logger
+
+logger = get_logger("minio")
+
 
 def get_minio_client():
     """Get MinIO client instance."""
+    logger.debug(f"Creating MinIO client for endpoint: {settings.minio_endpoint}")
     return Minio(
-        os.getenv("MINIO_ENDPOINT"),
-        access_key=os.getenv("MINIO_ACCESS_KEY"),
-        secret_key=os.getenv("MINIO_SECRET_KEY"),
-        secure=False,  # Set to True if using HTTPS
+        settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=settings.minio_secure,
     )
 
 

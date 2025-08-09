@@ -1,26 +1,26 @@
-import os
 from contextlib import contextmanager
 
 from fastapi import HTTPException
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from app.core.config import settings
+from app.core.logging import get_logger
+
+logger = get_logger("postgres")
+
 
 @contextmanager
-def get_postgres_connection(db_name=None):
+def get_postgres_connection(use_admin_db: bool = False):
     """Context manager for PostgreSQL connections."""
     conn = None
     try:
-        # Build the connection string from environment variables
-        user = os.getenv("POSTGRES_USER")
-        password = os.getenv("POSTGRES_PASSWORD")
-        host = os.getenv("POSTGRES_HOST")
-        port = os.getenv("POSTGRES_PORT", "5432")
-        db = os.getenv("POSTGRES_DB")
-        dsn = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        dsn = settings.postgres_admin_dsn if use_admin_db else settings.postgres_dsn
+        logger.debug(f"Connecting to PostgreSQL: {'admin' if use_admin_db else 'app'} database")
         conn = psycopg2.connect(dsn, cursor_factory=RealDictCursor)
         yield conn
     except Exception as e:
+        logger.error(f"Failed to create PostgreSQL connection: {str(e)}")
         raise RuntimeError(f"Failed to create PostgreSQL connection: {str(e)}")
     finally:
         if conn:
@@ -105,13 +105,7 @@ def query_music():
 def list_all_dbs_from_postgres():
     """List all databases in the PostgreSQL instance."""
     try:
-        # Connect to the 'postgres' default database to list all DBs
-        user = os.getenv("POSTGRES_USER")
-        password = os.getenv("POSTGRES_PASSWORD")
-        host = os.getenv("POSTGRES_HOST")
-        port = os.getenv("POSTGRES_PORT", "5432")
-        dsn = f"postgresql://{user}:{password}@{host}:{port}/postgres"
-        with psycopg2.connect(dsn, cursor_factory=RealDictCursor) as conn:
+        with get_postgres_connection(use_admin_db=True) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     "SELECT datname FROM pg_database WHERE datistemplate = false;"
@@ -125,11 +119,8 @@ def list_all_dbs_from_postgres():
 def list_tables_in_db(db_name: str):
     """List all tables in the specified PostgreSQL database."""
     try:
-        user = os.getenv("POSTGRES_USER")
-        password = os.getenv("POSTGRES_PASSWORD")
-        host = os.getenv("POSTGRES_HOST")
-        port = os.getenv("POSTGRES_PORT", "5432")
-        dsn = f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+        # Create a custom DSN for the specific database
+        dsn = f"postgresql://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}:{settings.postgres_port}/{db_name}"
         with psycopg2.connect(dsn, cursor_factory=RealDictCursor) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
