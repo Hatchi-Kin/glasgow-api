@@ -18,7 +18,6 @@ app = FastAPI(
 )
 
 
-
 logger.info(f"Starting {settings.app_name} v{settings.app_version}")
 logger.info(log_config_info())
 

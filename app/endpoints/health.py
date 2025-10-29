@@ -22,4 +22,4 @@ def health_check() -> Dict[str, Any]:
 @router.get("/health/simple", response_model=StatusResponse)
 def simple_health_check():
     """Simple health check for basic liveness probe."""
-    return {"status": "healthy"}
+    return {"status": "very healthy"}

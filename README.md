@@ -207,3 +207,32 @@ image: hatchikin/glasgow-fastapi:v1.2.3
 - **FastAPI**: https://fastapi.tiangolo.com/
 - **Docker Hub**: https://hub.docker.com/r/hatchikin/glasgow-fastapi
 
+
+
+## TODO (Future Improvements)
+
+- Docs and config alignment
+  - Align README env vars and examples with code (POSTGRES_HOST/PORT/USER/PASSWORD/DB, MINIO_*). Current README shows DATABASE_URL and some endpoints that don’t exist.
+  - Add a .env.example with required variables.
+  - Optionally support DATABASE_URL in Settings for flexibility.
+- API consistency
+  - Standardize route prefixes and casing (use "/minio" not "/MiniO"; tags like "MinIO").
+  - Use proper HTTP verbs (e.g., make /postgresql/setup_music a POST).
+  - Consider conventional /healthz and /readyz endpoints and add an API version prefix (e.g., /api/v1).
+- Security for file uploads
+  - Sanitize subfolder and filename to prevent path traversal; write only under the music folder.
+  - Validate content type/extension and restrict subfolder characters.
+  - Stream uploads to file in chunks instead of reading all into memory.
+- Observability and logging
+  - Replace custom logger-based timestamp in health with datetime.now(timezone.utc).isoformat().
+  - Remove unused imports; consider JSON logs and request-id middleware in production.
+- Dependencies and build
+  - Pin versions in requirements.txt for reproducible builds.
+  - In Dockerfile, install to system site-packages (drop --user) and copy /usr/local; set PYTHONDONTWRITEBYTECODE=1 and PYTHONUNBUFFERED=1.
+  - Add Docker HEALTHCHECK (e.g., GET /health/simple). Optionally allow UVICORN_WORKERS via env.
+- Database layer
+  - Add connect_timeout to the PostgreSQL DSN.
+  - Reuse the connection context manager in list_tables_in_db for consistency.
+- Minor polish
+  - Add FastAPI description/contact/license to improve OpenAPI docs.
+  - Optionally add CORS for local development.
