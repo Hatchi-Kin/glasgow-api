@@ -14,12 +14,12 @@ def read_root():
 
 
 @router.get("/health")
-def health_check() -> Dict[str, Any]:
-    """Comprehensive health check of all services."""
-    return comprehensive_health_check()
-
-
-@router.get("/health/simple", response_model=StatusResponse)
 def simple_health_check():
     """Simple health check for basic liveness probe."""
     return {"status": "very healthy"}
+
+
+@router.get("/health/comprehensive", response_model=StatusResponse)
+def health_check() -> Dict[str, Any]:
+    """Comprehensive health check of all services."""
+    return comprehensive_health_check()
