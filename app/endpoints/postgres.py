@@ -2,14 +2,16 @@ from fastapi import APIRouter
 
 from app.models.common import StatusResponse
 from app.models.postgres import (
-    MusicResponse,
+    MegasetResponse,
+    MegasetTrack,
     PostgresHealthResponse,
     DatabaseListResponse,
     TableListResponse,
 )
 from app.services.postgres.service import (
-    setup_music_db,
-    query_music,
+    migrate_music_data_from_sqlite,
+    query_megaset,
+    get_random_megaset_track,
     health_check,
     list_all_dbs_from_postgres,
     list_tables_in_db,
@@ -24,14 +26,19 @@ def check_health():
     return health_check()
 
 
-@router.get("/setup_music", response_model=StatusResponse)
-def setup():
-    return setup_music_db()
+@router.post("/migrate_music", response_model=StatusResponse)
+def migrate_music():
+    return migrate_music_data_from_sqlite()
 
 
-@router.get("/music", response_model=MusicResponse)
-def get_music():
-    return query_music()
+@router.get("/megaset", response_model=MegasetResponse)
+def get_megaset(limit: int = 100, offset: int = 0):
+    return query_megaset(limit=limit, offset=offset)
+
+
+@router.get("/megaset/random", response_model=MegasetTrack)
+def get_random_track():
+    return get_random_megaset_track()
 
 
 @router.get("/databases", response_model=DatabaseListResponse)

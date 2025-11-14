@@ -1,3 +1,5 @@
+import sqlite3
+import os
 from contextlib import contextmanager
 
 from fastapi import HTTPException
@@ -6,6 +8,7 @@ from psycopg2.extras import RealDictCursor
 
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.services.minio.service import download_object
 
 logger = get_logger("postgres")
 
@@ -27,71 +30,82 @@ def get_postgres_connection(use_admin_db: bool = False):
             conn.close()
 
 
-def setup_music_db():
-    """Create music table and fill it with Graceland tracks in one go."""
-    tracks = [
-        ("The Boy in the Bubble", "Paul Simon / Paul Simon - Forere Motlhoheloa", 1),
-        ("Graceland", "Paul Simon", 2),
-        (
-            "I Know What I Know",
-            "Paul Simon / Paul Simon - General Mikhatshani Daniel Shirinda",
-            3,
-        ),
-        ("Gumboots", "Paul Simon / Paul Simon - Lulu Masilela - Johnson Mkhalali", 4),
-        ("Diamonds on the Soles of Her Shoes", "Paul Simon - Joseph Shabalala", 5),
-        ("You Can Call Me Al", "Paul Simon", 6),
-        ("Under African Skies", "Paul Simon", 7),
-        ("Homeless", "Paul Simon - Joseph Shabalala", 8),
-        ("Crazy Love Vol II", "Paul Simon", 9),
-        ("That Was Your Mother", "Paul Simon", 10),
-        ("All Around the World or the Myth of Fingerprints", "Paul Simon", 11),
-    ]
+def migrate_music_data_from_sqlite(bucket_name: str = "megaset-sqlite", object_name: str = "music_vector_database.db"):
+    """
+    Migrate music data from a SQLite database stored in MinIO to PostgreSQL.
+    """
+    temp_db_path = f"/tmp/{object_name}"
+    try:
+        # Download the SQLite database from MinIO
+        download_object(bucket_name, object_name, temp_db_path)
 
+        # Connect to the downloaded SQLite database
+        sqlite_conn = sqlite3.connect(temp_db_path)
+        sqlite_cursor = sqlite_conn.cursor()
+        sqlite_cursor.execute("SELECT id, filename, filepath, relative_path, album_folder, artist_folder, filesize, title, artist, album, year, tracknumber, genre, top_5_genres, created_at FROM songs")
+        rows = sqlite_cursor.fetchall()
+        sqlite_conn.close()
+
+    except HTTPException as e:
+        # Re-raise HTTP exceptions from the download function
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read from SQLite database: {str(e)}")
+    finally:
+        # Ensure the temporary file is cleaned up
+        if os.path.exists(temp_db_path):
+            os.remove(temp_db_path)
+
+    # Connect to PostgreSQL and insert data
     try:
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
                 # Create table
                 cursor.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS music (
+                    CREATE TABLE IF NOT EXISTS megaset (
                         id SERIAL PRIMARY KEY,
-                        title VARCHAR(255) NOT NULL,
-                        artist VARCHAR(255) NOT NULL,
-                        album VARCHAR(255) DEFAULT 'Graceland',
-                        track_number INTEGER,
+                        filename TEXT NOT NULL,
+                        filepath TEXT NOT NULL UNIQUE,
+                        relative_path TEXT NOT NULL,
+                        album_folder TEXT,
+                        artist_folder TEXT,
+                        filesize REAL,
+                        title TEXT,
+                        artist TEXT,
+                        album TEXT,
+                        year INTEGER,
+                        tracknumber INTEGER,
+                        genre TEXT,
+                        top_5_genres TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """
                 )
 
-                # Clear existing Graceland data
-                cursor.execute("DELETE FROM music WHERE album = 'Graceland';")
-
                 # Insert tracks
-                cursor.executemany(
-                    """
-                    INSERT INTO music (title, artist, track_number)
-                    VALUES (%s, %s, %s);
-                """,
-                    tracks,
-                )
-
+                insert_query = """
+                    INSERT INTO megaset (id, filename, filepath, relative_path, album_folder, artist_folder, filesize, title, artist, album, year, tracknumber, genre, top_5_genres, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (filepath) DO NOTHING;
+                """
+                cursor.executemany(insert_query, rows)
                 conn.commit()
 
                 return {
                     "status": "success",
-                    "message": f"Music table created and populated with {len(tracks)} Graceland tracks",
+                    "message": f"Migrated {len(rows)} tracks from SQLite to PostgreSQL.",
                 }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to write to PostgreSQL: {str(e)}")
 
 
-def query_music():
-    """Query all music tracks."""
+def query_megaset(limit: int = 100, offset: int = 0):
+    """Query all music tracks from the megaset table."""
     try:
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT * FROM music ORDER BY track_number;")
+                cursor.execute("SELECT * FROM megaset ORDER BY artist, album, tracknumber LIMIT %s OFFSET %s;", (limit, offset))
                 rows = cursor.fetchall()
                 return {
                     "status": "success",
@@ -100,6 +114,25 @@ def query_music():
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_random_megaset_track():
+    """Query a single random music track from the megaset table."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM megaset ORDER BY RANDOM() LIMIT 1;")
+                row = cursor.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="No tracks found in the database.")
+                return dict(row)
+    except Exception as e:
+        # Re-raise HTTPException to preserve status code and detail
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 def list_all_dbs_from_postgres():

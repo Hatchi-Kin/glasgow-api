@@ -5,19 +5,28 @@ from pydantic import BaseModel, Field
 from app.models.common import HealthResponse
 
 
-class MusicTrack(BaseModel):
+class MegasetTrack(BaseModel):
     id: int
-    title: str
-    artist: str
-    album: str = "Graceland"
-    track_number: Optional[int] = None
+    filename: str
+    filepath: str
+    relative_path: str
+    album_folder: Optional[str] = None
+    artist_folder: Optional[str] = None
+    filesize: Optional[float] = None
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    year: Optional[int] = None
+    tracknumber: Optional[int] = None
+    genre: Optional[str] = None
+    top_5_genres: Optional[str] = None
     created_at: datetime
 
 
-class MusicResponse(BaseModel):
+class MegasetResponse(BaseModel):
     status: str
     count: int
-    tracks: List[MusicTrack]
+    tracks: List[MegasetTrack]
 
 
 class DatabaseListResponse(BaseModel):
