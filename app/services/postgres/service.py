@@ -46,6 +46,18 @@ def migrate_music_data_from_sqlite(bucket_name: str = "megaset-sqlite", object_n
         rows = sqlite_cursor.fetchall()
         sqlite_conn.close()
 
+        # Clean data: Replace empty strings in integer columns with None
+        cleaned_rows = []
+        for row in rows:
+            row_list = list(row)
+            # year is at index 10, tracknumber is at index 11
+            if row_list[10] == '':
+                row_list[10] = None
+            if row_list[11] == '':
+                row_list[11] = None
+            cleaned_rows.append(tuple(row_list))
+        rows = cleaned_rows
+
     except HTTPException as e:
         # Re-raise HTTP exceptions from the download function
         raise e
