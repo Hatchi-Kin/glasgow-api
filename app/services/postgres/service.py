@@ -272,7 +272,7 @@ def find_similar_tracks_by_512_embedding(query_embedding: list[float], limit: in
                 # Use the <-> operator for L2 distance (Euclidean distance)
                 # or <=> for cosine distance (if you prefer that)
                 query = """
-                    SELECT id, filename, filepath, title, artist, album, (embedding_512_vector <-> %s) AS distance
+                    SELECT id, filename, filepath, title, artist, album, (embedding_512_vector <-> CAST(%s AS vector)) AS distance
                     FROM megaset
                     WHERE embedding_512_vector IS NOT NULL
                     ORDER BY distance
