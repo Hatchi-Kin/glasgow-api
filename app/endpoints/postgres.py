@@ -11,6 +11,7 @@ from app.models.postgres import (
     VectorSearchResponse,
 )
 from app.services.postgres.service import (
+    create_users_table,
     migrate_music_data_from_sqlite,
     query_megaset,
     get_random_megaset_track,
@@ -69,3 +70,8 @@ def get_databases():
 @router.get("/tables/{db_name}", response_model=TableListResponse)
 def get_tables(db_name: str):
     return list_tables_in_db(db_name)
+
+
+@router.post("/users/create_table", response_model=StatusResponse)
+def create_users_table_endpoint():
+    return create_users_table()
