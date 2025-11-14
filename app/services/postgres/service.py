@@ -212,11 +212,17 @@ def bulk_insert_512_embeddings(embeddings_bucket_name: str = "megaset"):
                             update_fields.append("album = %s")
                             update_values.append(pkl_data['album'])
                         if not existing_year and pkl_data.get('year') is not None:
+                            year_value = pkl_data['year']
+                            if isinstance(year_value, str) and year_value == '':
+                                year_value = None
                             update_fields.append("year = %s")
-                            update_values.append(pkl_data['year'])
+                            update_values.append(year_value)
                         if not existing_tracknumber and pkl_data.get('tracknumber') is not None:
+                            tracknumber_value = pkl_data['tracknumber']
+                            if isinstance(tracknumber_value, str) and tracknumber_value == '':
+                                tracknumber_value = None
                             update_fields.append("tracknumber = %s")
-                            update_values.append(pkl_data['tracknumber'])
+                            update_values.append(tracknumber_value)
                         if not existing_genre and pkl_data.get('genre'):
                             update_fields.append("genre = %s")
                             update_values.append(pkl_data['genre'])
