@@ -35,6 +35,36 @@ def get_postgres_connection(use_admin_db: bool = False):
             conn.close()
 
 
+def create_users_table():
+    """Create the users table in the PostgreSQL database."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                        id SERIAL PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        username VARCHAR(255) UNIQUE,
+                        hashed_password VARCHAR(255) NOT NULL,
+                        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                        is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        jti VARCHAR(36) UNIQUE,
+                        jti_expires_at TIMESTAMP WITH TIME ZONE
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+                    CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+                    CREATE INDEX IF NOT EXISTS idx_users_jti ON users (jti);
+                """
+                )
+                conn.commit()
+                return {"status": "success", "message": "Users table created or already exists."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create users table: {str(e)}")
+
+
 def add_embedding_512_column():
     """Add the embedding_512_vector column to the megaset table."""
     try:
