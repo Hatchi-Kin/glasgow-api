@@ -5,3 +5,4 @@ minio
 aiofiles
 python-multipart
 pydantic-settings
+numpy
