@@ -21,6 +21,7 @@ from app.services.postgres.service import (
     health_check,
     list_all_dbs_from_postgres,
     list_tables_in_db,
+    insert_admin_user,
 )
 
 
@@ -75,3 +76,13 @@ def get_tables(db_name: str):
 @router.post("/users/create_table", response_model=StatusResponse)
 def create_users_table_endpoint():
     return create_users_table()
+
+
+@router.post("/admin/create-initial-admin", response_model=StatusResponse)
+def create_initial_admin_endpoint(
+    email: str = Body(..., embed=True),
+    username: str = Body(..., embed=True),
+    hashed_password: str = Body(..., embed=True),
+):
+    """Creates an initial admin user with a pre-hashed password."""
+    return insert_admin_user(email, username, hashed_password)

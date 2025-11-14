@@ -65,6 +65,31 @@ def create_users_table():
         raise HTTPException(status_code=500, detail=f"Failed to create users table: {str(e)}")
 
 
+def insert_admin_user(email: str, username: str, hashed_password: str):
+    """Insert an admin user into the database if they don't already exist."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Check if user already exists
+                cursor.execute("SELECT id FROM users WHERE email = %s;", (email,))
+                if cursor.fetchone():
+                    return {"status": "info", "message": f"User with email {email} already exists."}
+
+                cursor.execute(
+                    """
+                    INSERT INTO users (email, username, hashed_password, is_active, is_admin)
+                    VALUES (%s, %s, %s, TRUE, TRUE)
+                    RETURNING id;
+                    """,
+                    (email, username, hashed_password),
+                )
+                user_id = cursor.fetchone()["id"]
+                conn.commit()
+                return {"status": "success", "message": f"Admin user {email} created with ID {user_id}."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create admin user: {str(e)}")
+
+
 def add_embedding_512_column():
     """Add the embedding_512_vector column to the megaset table."""
     try:
