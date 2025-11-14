@@ -133,7 +133,7 @@ def migrate_music_data_from_sqlite(bucket_name: str = "megaset-sqlite", object_n
         raise HTTPException(status_code=500, detail=f"Failed to write to PostgreSQL: {str(e)}")
 
 
-def bulk_insert_512_embeddings(embeddings_bucket_name: str = "megaset-embeddings"):
+def bulk_insert_512_embeddings(embeddings_bucket_name: str = "megaset"):
     """
     Bulk insert 512-dimensional embeddings and update metadata into the megaset table.
     Embeddings and metadata are read from .pkl files in the specified MinIO bucket.
