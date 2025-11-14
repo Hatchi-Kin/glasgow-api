@@ -1,5 +1,10 @@
 import sqlite3
 import os
+import json
+import numpy as np
+import tempfile
+import shutil
+import pickle
 from contextlib import contextmanager
 
 from fastapi import HTTPException
@@ -28,6 +33,22 @@ def get_postgres_connection(use_admin_db: bool = False):
     finally:
         if conn:
             conn.close()
+
+
+def add_embedding_512_column():
+    """Add the embedding_512_vector column to the megaset table."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE megaset ADD COLUMN embedding_512_vector vector(512);"
+                )
+                conn.commit()
+                return {"status": "success", "message": "Added embedding_512_vector column to megaset table."}
+    except psycopg2.errors.DuplicateColumn:
+        return {"status": "info", "message": "embedding_512_vector column already exists."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add embedding_512_vector column: {str(e)}")
 
 
 def migrate_music_data_from_sqlite(bucket_name: str = "megaset-sqlite", object_name: str = "music_vector_database.db"):
@@ -110,6 +131,165 @@ def migrate_music_data_from_sqlite(bucket_name: str = "megaset-sqlite", object_n
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write to PostgreSQL: {str(e)}")
+
+
+def bulk_insert_512_embeddings(embeddings_bucket_name: str = "megaset-embeddings"):
+    """
+    Bulk insert 512-dimensional embeddings and update metadata into the megaset table.
+    Embeddings and metadata are read from .pkl files in the specified MinIO bucket.
+    """
+    processed_count = 0
+    failed_count = 0
+    temp_dir = None
+
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # 1. Get all song IDs and filepaths from PostgreSQL
+                # We fetch all to ensure we can update metadata even if embeddings exist
+                cursor.execute("SELECT id, filepath, filename, title, artist, album, year, tracknumber, genre, filesize FROM megaset;")
+                songs_in_postgres = cursor.fetchall()
+                logger.info(f"Found {len(songs_in_postgres)} songs in PostgreSQL to process for embeddings and metadata.")
+
+                if not songs_in_postgres:
+                    return {"status": "info", "message": "No songs found in PostgreSQL to process."}
+
+                temp_dir = tempfile.mkdtemp()
+                logger.info(f"Created temporary directory: {temp_dir}")
+
+                for song_data in songs_in_postgres:
+                    song_id = song_data["id"]
+                    filepath = song_data["filepath"]
+                    
+                    # Existing metadata from PostgreSQL
+                    existing_filename = song_data["filename"]
+                    existing_title = song_data["title"]
+                    existing_artist = song_data["artist"]
+                    existing_album = song_data["album"]
+                    existing_year = song_data["year"]
+                    existing_tracknumber = song_data["tracknumber"]
+                    existing_genre = song_data["genre"]
+                    existing_filesize = song_data["filesize"]
+
+                    local_pkl_path = None
+                    try:
+                        # 2. Construct MinIO object name for .pkl
+                        # Example: /path/to/song.mp3 -> path/to/song.pkl
+                        object_name = filepath.lstrip('/').rsplit('.', 1)[0] + '.pkl'
+                        local_pkl_path = os.path.join(temp_dir, os.path.basename(object_name))
+
+                        # 3. Download .pkl from MinIO
+                        logger.debug(f"Downloading {object_name} from {embeddings_bucket_name} to {local_pkl_path}")
+                        download_object(embeddings_bucket_name, object_name, local_pkl_path)
+
+                        # 4. Load data from .pkl
+                        with open(local_pkl_path, 'rb') as f:
+                            pkl_data = pickle.load(f)
+
+                        embedding_512 = pkl_data.get('embedding_512')
+                        if embedding_512 is not None and (not isinstance(embedding_512, np.ndarray) or embedding_512.shape != (512,)):
+                            raise ValueError(f"Invalid embedding_512 format or shape for {object_name}")
+                        
+                        # Extract metadata from pkl_data, prioritizing existing non-NULL values
+                        update_fields = []
+                        update_values = []
+
+                        if embedding_512 is not None:
+                            update_fields.append("embedding_512_vector = %s")
+                            update_values.append(embedding_512.tolist())
+
+                        # Update metadata only if it's None or empty in PostgreSQL
+                        if not existing_filename and pkl_data.get('filename'):
+                            update_fields.append("filename = %s")
+                            update_values.append(pkl_data['filename'])
+                        if not existing_title and pkl_data.get('title'):
+                            update_fields.append("title = %s")
+                            update_values.append(pkl_data['title'])
+                        if not existing_artist and pkl_data.get('artist'):
+                            update_fields.append("artist = %s")
+                            update_values.append(pkl_data['artist'])
+                        if not existing_album and pkl_data.get('album'):
+                            update_fields.append("album = %s")
+                            update_values.append(pkl_data['album'])
+                        if not existing_year and pkl_data.get('year') is not None:
+                            update_fields.append("year = %s")
+                            update_values.append(pkl_data['year'])
+                        if not existing_tracknumber and pkl_data.get('tracknumber') is not None:
+                            update_fields.append("tracknumber = %s")
+                            update_values.append(pkl_data['tracknumber'])
+                        if not existing_genre and pkl_data.get('genre'):
+                            update_fields.append("genre = %s")
+                            update_values.append(pkl_data['genre'])
+                        if not existing_filesize and pkl_data.get('filesize') is not None:
+                            update_fields.append("filesize = %s")
+                            update_values.append(pkl_data['filesize'])
+
+                        if update_fields:
+                            update_query = f"UPDATE megaset SET {', '.join(update_fields)} WHERE id = %s;"
+                            cursor.execute(update_query, (*update_values, song_id))
+                            processed_count += 1
+                        else:
+                            logger.debug(f"No updates needed for song ID {song_id}")
+
+                    except Exception as e:
+                        logger.error(f"Failed to process song ID {song_id} (filepath: {filepath}): {str(e)}")
+                        failed_count += 1
+                    finally:
+                        if local_pkl_path and os.path.exists(local_pkl_path):
+                            os.remove(local_pkl_path)
+
+                conn.commit()
+                return {
+                    "status": "success",
+                    "message": f"Bulk insert completed. Processed: {processed_count}, Failed: {failed_count}",
+                }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk insert failed: {str(e)}")
+    finally:
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+            logger.info(f"Cleaned up temporary directory: {temp_dir}")
+
+
+def find_similar_tracks_by_512_embedding(query_embedding: list[float], limit: int = 10):
+    """
+    Find similar tracks using 512-dimensional vector embeddings.
+    """
+    if not query_embedding or len(query_embedding) != 512:
+        raise HTTPException(status_code=400, detail="Invalid query embedding. Must be a list of 512 floats.")
+
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Use the <-> operator for L2 distance (Euclidean distance)
+                # or <=> for cosine distance (if you prefer that)
+                query = """
+                    SELECT id, filename, filepath, title, artist, album, (embedding_512_vector <-> %s) AS distance
+                    FROM megaset
+                    WHERE embedding_512_vector IS NOT NULL
+                    ORDER BY distance
+                    LIMIT %s;
+                """
+                cursor.execute(query, (query_embedding, limit))
+                rows = cursor.fetchall()
+
+                results = []
+                for row in rows:
+                    results.append({
+                        "id": row["id"],
+                        "filename": row["filename"],
+                        "filepath": row["filepath"],
+                        "title": row["title"],
+                        "artist": row["artist"],
+                        "album": row["album"],
+                        "distance": row["distance"],
+                        "similarity_score": 1 - (row["distance"] / 2) # Simple normalization for L2 distance
+                    })
+                return {"status": "success", "tracks": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector search failed: {str(e)}")
 
 
 def query_megaset(limit: int = 100, offset: int = 0):

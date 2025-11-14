@@ -21,12 +21,34 @@ class MegasetTrack(BaseModel):
     genre: Optional[str] = None
     top_5_genres: Optional[str] = None
     created_at: datetime
+    embedding_512_vector: Optional[List[float]] = None
 
 
 class MegasetResponse(BaseModel):
     status: str
     count: int
     tracks: List[MegasetTrack]
+
+
+class SimilarityResult(BaseModel):
+    id: int
+    filename: str
+    filepath: str
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    distance: float
+    similarity_score: float
+
+
+class VectorSearchRequest(BaseModel):
+    query_embedding: List[float]
+    limit: int = 10
+
+
+class VectorSearchResponse(BaseModel):
+    status: str
+    tracks: List[SimilarityResult]
 
 
 class DatabaseListResponse(BaseModel):

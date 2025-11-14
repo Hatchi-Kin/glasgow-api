@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 
 from app.models.common import StatusResponse
 from app.models.postgres import (
@@ -7,11 +7,16 @@ from app.models.postgres import (
     PostgresHealthResponse,
     DatabaseListResponse,
     TableListResponse,
+    VectorSearchRequest,
+    VectorSearchResponse,
 )
 from app.services.postgres.service import (
     migrate_music_data_from_sqlite,
     query_megaset,
     get_random_megaset_track,
+    add_embedding_512_column,
+    bulk_insert_512_embeddings,
+    find_similar_tracks_by_512_embedding,
     health_check,
     list_all_dbs_from_postgres,
     list_tables_in_db,
@@ -29,6 +34,21 @@ def check_health():
 @router.post("/migrate_music", response_model=StatusResponse)
 def migrate_music():
     return migrate_music_data_from_sqlite()
+
+
+@router.post("/megaset/add_512_embedding_column", response_model=StatusResponse)
+def add_512_embedding_column_endpoint():
+    return add_embedding_512_column()
+
+
+@router.post("/megaset/bulk_insert_512_embeddings", response_model=StatusResponse)
+def bulk_insert_512_embeddings_endpoint():
+    return bulk_insert_512_embeddings()
+
+
+@router.post("/megaset/search_by_512_embedding", response_model=VectorSearchResponse)
+def search_by_512_embedding_endpoint(request: VectorSearchRequest = Body(...)):
+    return find_similar_tracks_by_512_embedding(request.query_embedding, request.limit)
 
 
 @router.get("/megaset", response_model=MegasetResponse)
