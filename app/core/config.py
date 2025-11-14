@@ -1,9 +1,10 @@
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings with validation and environment variable support."""
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
     
     # App settings
     app_name: str = Field(default="Glasgow GitOps API", description="Application name")
@@ -29,21 +30,6 @@ class Settings(BaseSettings):
         default={'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.aac'},
         description="Allowed music file extensions"
     )
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        # Map environment variables to field names
-        fields = {
-            'postgres_host': {'env': 'POSTGRES_HOST'},
-            'postgres_port': {'env': 'POSTGRES_PORT'},
-            'postgres_user': {'env': 'POSTGRES_USER'},
-            'postgres_password': {'env': 'POSTGRES_PASSWORD'},
-            'postgres_db': {'env': 'POSTGRES_DB'},
-            'minio_endpoint': {'env': 'MINIO_ENDPOINT'},
-            'minio_access_key': {'env': 'MINIO_ACCESS_KEY'},
-            'minio_secret_key': {'env': 'MINIO_SECRET_KEY'},
-        }
     
     @property
     def postgres_dsn(self) -> str:

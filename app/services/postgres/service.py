@@ -90,6 +90,32 @@ def insert_admin_user(email: str, username: str, hashed_password: str):
         raise HTTPException(status_code=500, detail=f"Failed to create admin user: {str(e)}")
 
 
+def update_user_password(email: str, hashed_password: str):
+    """Update a user's password in the database."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET hashed_password = %s,
+                        updated_at = NOW()
+                    WHERE email = %s
+                    RETURNING id;
+                    """,
+                    (hashed_password, email),
+                )
+                user_id = cursor.fetchone()
+                if not user_id:
+                    raise HTTPException(status_code=404, detail=f"User with email {email} not found.")
+                conn.commit()
+                return {"status": "success", "message": f"Password for user {email} updated successfully."}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update user password: {str(e)}")
+
+
 def add_embedding_512_column():
     """Add the embedding_512_vector column to the megaset table."""
     try:
