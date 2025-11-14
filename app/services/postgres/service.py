@@ -291,7 +291,7 @@ def find_similar_tracks_by_512_embedding(query_embedding: list[float], limit: in
                         "artist": row["artist"],
                         "album": row["album"],
                         "distance": row["distance"],
-                        "similarity_score": 1 - (row["distance"] / 2) # Simple normalization for L2 distance
+                        "similarity_score": 1 / (1 + row["distance"]) # More appropriate normalization for L2 distance
                     })
                 return {"status": "success", "tracks": results}
     except Exception as e:
