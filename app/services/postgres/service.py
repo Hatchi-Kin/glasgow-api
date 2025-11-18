@@ -40,8 +40,7 @@ def create_users_table():
     try:
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
                         email VARCHAR(255) UNIQUE NOT NULL,
@@ -57,13 +56,400 @@ def create_users_table():
                     CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
                     CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
                     CREATE INDEX IF NOT EXISTS idx_users_jti ON users (jti);
-                """
-                )
+                """)
                 conn.commit()
-                return {"status": "success", "message": "Users table created or already exists."}
+        return {"status": "success", "message": "Users table created or already exists."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create users table: {str(e)}")
 
+
+def create_favorites_and_playlists_tables():
+    """Create the favorites, playlists, and playlist_tracks tables."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    -- Favorites table
+                    CREATE TABLE IF NOT EXISTS favorites (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        track_id INTEGER NOT NULL REFERENCES megaset(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(user_id, track_id)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+                    
+                    -- Playlists table
+                    CREATE TABLE IF NOT EXISTS playlists (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
+                    
+                    -- Playlist tracks table
+                    CREATE TABLE IF NOT EXISTS playlist_tracks (
+                        id SERIAL PRIMARY KEY,
+                        playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+                        track_id INTEGER NOT NULL REFERENCES megaset(id) ON DELETE CASCADE,
+                        position INTEGER NOT NULL,
+                        added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                        UNIQUE(playlist_id, track_id),
+                        UNIQUE(playlist_id, position)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_id ON playlist_tracks(playlist_id);
+                """)
+                conn.commit()
+        return {"status": "success", "message": "Favorites and playlists tables created or already exist."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create favorites/playlists tables: {str(e)}")
+
+
+# ============================================
+# FAVORITES FUNCTIONS
+# ============================================
+
+def add_favorite(user_id: int, track_id: int):
+    """Add a track to user's favorites (max 20)."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Check if user has reached the limit
+                cursor.execute("SELECT COUNT(*) as count FROM favorites WHERE user_id = %s;", (user_id,))
+                count = cursor.fetchone()["count"]
+                
+                if count >= 20:
+                    raise HTTPException(status_code=400, detail="Maximum 20 favorites allowed")
+                
+                # Check if track exists
+                cursor.execute("SELECT id FROM megaset WHERE id = %s;", (track_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Track not found")
+                
+                # Add favorite (ON CONFLICT DO NOTHING prevents duplicates)
+                cursor.execute(
+                    "INSERT INTO favorites (user_id, track_id) VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING id;",
+                    (user_id, track_id)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                
+                if result:
+                    return {"status": "success", "message": "Track added to favorites"}
+                else:
+                    return {"status": "info", "message": "Track already in favorites"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add favorite: {str(e)}")
+
+
+def remove_favorite(user_id: int, track_id: int):
+    """Remove a track from user's favorites."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM favorites WHERE user_id = %s AND track_id = %s RETURNING id;",
+                    (user_id, track_id)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                
+                if result:
+                    return {"status": "success", "message": "Track removed from favorites"}
+                else:
+                    raise HTTPException(status_code=404, detail="Favorite not found")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to remove favorite: {str(e)}")
+
+
+def get_user_favorites(user_id: int):
+    """Get all favorite tracks for a user."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT m.*, f.created_at as favorited_at
+                    FROM favorites f
+                    JOIN megaset m ON f.track_id = m.id
+                    WHERE f.user_id = %s
+                    ORDER BY f.created_at DESC;
+                """, (user_id,))
+                rows = cursor.fetchall()
+                
+                # Get total count
+                cursor.execute("SELECT COUNT(*) as count FROM favorites WHERE user_id = %s;", (user_id,))
+                total = cursor.fetchone()["count"]
+                
+                return {
+                    "tracks": [dict(row) for row in rows],
+                    "total": total
+                }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get favorites: {str(e)}")
+
+
+def check_is_favorite(user_id: int, track_id: int):
+    """Check if a track is in user's favorites."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id FROM favorites WHERE user_id = %s AND track_id = %s;",
+                    (user_id, track_id)
+                )
+                result = cursor.fetchone()
+                return {"is_favorite": result is not None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check favorite: {str(e)}")
+
+
+# ============================================
+# PLAYLISTS FUNCTIONS
+# ============================================
+
+def create_playlist(user_id: int, name: str):
+    """Create a new playlist for a user."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO playlists (user_id, name) VALUES (%s, %s) RETURNING id, name, created_at, updated_at;",
+                    (user_id, name)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                
+                return {
+                    "id": result["id"],
+                    "name": result["name"],
+                    "track_count": 0,
+                    "created_at": result["created_at"].isoformat(),
+                    "updated_at": result["updated_at"].isoformat()
+                }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create playlist: {str(e)}")
+
+
+def get_user_playlists(user_id: int):
+    """Get all playlists for a user with track counts."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        p.id, 
+                        p.name, 
+                        p.created_at, 
+                        p.updated_at,
+                        COUNT(pt.id) as track_count
+                    FROM playlists p
+                    LEFT JOIN playlist_tracks pt ON p.id = pt.playlist_id
+                    WHERE p.user_id = %s
+                    GROUP BY p.id, p.name, p.created_at, p.updated_at
+                    ORDER BY p.updated_at DESC;
+                """, (user_id,))
+                rows = cursor.fetchall()
+                
+                playlists = []
+                for row in rows:
+                    playlists.append({
+                        "id": row["id"],
+                        "name": row["name"],
+                        "track_count": row["track_count"],
+                        "created_at": row["created_at"].isoformat(),
+                        "updated_at": row["updated_at"].isoformat()
+                    })
+                
+                return {"playlists": playlists}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get playlists: {str(e)}")
+
+
+def get_playlist_with_tracks(user_id: int, playlist_id: int):
+    """Get a playlist with all its tracks."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Get playlist info
+                cursor.execute(
+                    "SELECT id, name, created_at, updated_at FROM playlists WHERE id = %s AND user_id = %s;",
+                    (playlist_id, user_id)
+                )
+                playlist = cursor.fetchone()
+                
+                if not playlist:
+                    raise HTTPException(status_code=404, detail="Playlist not found")
+                
+                # Get tracks
+                cursor.execute("""
+                    SELECT m.*, pt.position, pt.added_at
+                    FROM playlist_tracks pt
+                    JOIN megaset m ON pt.track_id = m.id
+                    WHERE pt.playlist_id = %s
+                    ORDER BY pt.position;
+                """, (playlist_id,))
+                tracks = cursor.fetchall()
+                
+                return {
+                    "id": playlist["id"],
+                    "name": playlist["name"],
+                    "tracks": [dict(track) for track in tracks],
+                    "created_at": playlist["created_at"].isoformat(),
+                    "updated_at": playlist["updated_at"].isoformat()
+                }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get playlist: {str(e)}")
+
+
+def update_playlist_name(user_id: int, playlist_id: int, new_name: str):
+    """Update a playlist's name."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE playlists 
+                    SET name = %s, updated_at = NOW() 
+                    WHERE id = %s AND user_id = %s 
+                    RETURNING id;
+                """, (new_name, playlist_id, user_id))
+                result = cursor.fetchone()
+                conn.commit()
+                
+                if result:
+                    return {"status": "success", "message": "Playlist name updated"}
+                else:
+                    raise HTTPException(status_code=404, detail="Playlist not found")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update playlist: {str(e)}")
+
+
+def delete_playlist(user_id: int, playlist_id: int):
+    """Delete a playlist."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM playlists WHERE id = %s AND user_id = %s RETURNING id;",
+                    (playlist_id, user_id)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                
+                if result:
+                    return {"status": "success", "message": "Playlist deleted"}
+                else:
+                    raise HTTPException(status_code=404, detail="Playlist not found")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete playlist: {str(e)}")
+
+
+def add_track_to_playlist(user_id: int, playlist_id: int, track_id: int):
+    """Add a track to a playlist (max 20 tracks)."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Verify playlist belongs to user
+                cursor.execute("SELECT id FROM playlists WHERE id = %s AND user_id = %s;", (playlist_id, user_id))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Playlist not found")
+                
+                # Check track count
+                cursor.execute("SELECT COUNT(*) as count FROM playlist_tracks WHERE playlist_id = %s;", (playlist_id,))
+                count = cursor.fetchone()["count"]
+                
+                if count >= 20:
+                    raise HTTPException(status_code=400, detail="Maximum 20 tracks per playlist")
+                
+                # Check if track exists
+                cursor.execute("SELECT id FROM megaset WHERE id = %s;", (track_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Track not found")
+                
+                # Get next position
+                cursor.execute("SELECT COALESCE(MAX(position), 0) + 1 as next_pos FROM playlist_tracks WHERE playlist_id = %s;", (playlist_id,))
+                next_position = cursor.fetchone()["next_pos"]
+                
+                # Add track
+                cursor.execute(
+                    "INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING RETURNING id;",
+                    (playlist_id, track_id, next_position)
+                )
+                result = cursor.fetchone()
+                
+                # Update playlist updated_at
+                cursor.execute("UPDATE playlists SET updated_at = NOW() WHERE id = %s;", (playlist_id,))
+                conn.commit()
+                
+                if result:
+                    return {"status": "success", "message": "Track added to playlist"}
+                else:
+                    return {"status": "info", "message": "Track already in playlist"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add track to playlist: {str(e)}")
+
+
+def remove_track_from_playlist(user_id: int, playlist_id: int, track_id: int):
+    """Remove a track from a playlist and reorder remaining tracks."""
+    try:
+        with get_postgres_connection() as conn:
+            with conn.cursor() as cursor:
+                # Verify playlist belongs to user
+                cursor.execute("SELECT id FROM playlists WHERE id = %s AND user_id = %s;", (playlist_id, user_id))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Playlist not found")
+                
+                # Get the position of the track to remove
+                cursor.execute(
+                    "SELECT position FROM playlist_tracks WHERE playlist_id = %s AND track_id = %s;",
+                    (playlist_id, track_id)
+                )
+                removed_track = cursor.fetchone()
+                
+                if not removed_track:
+                    raise HTTPException(status_code=404, detail="Track not in playlist")
+                
+                removed_position = removed_track["position"]
+                
+                # Delete the track
+                cursor.execute(
+                    "DELETE FROM playlist_tracks WHERE playlist_id = %s AND track_id = %s;",
+                    (playlist_id, track_id)
+                )
+                
+                # Reorder remaining tracks (decrement positions after removed track)
+                cursor.execute(
+                    "UPDATE playlist_tracks SET position = position - 1 WHERE playlist_id = %s AND position > %s;",
+                    (playlist_id, removed_position)
+                )
+                
+                # Update playlist updated_at
+                cursor.execute("UPDATE playlists SET updated_at = NOW() WHERE id = %s;", (playlist_id,))
+                conn.commit()
+                
+                return {"status": "success", "message": "Track removed from playlist"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to remove track from playlist: {str(e)}")
+
+
+# ============================================
+# EXISTING FUNCTIONS (unchanged)
+# ============================================
 
 def insert_admin_user(email: str, username: str, hashed_password: str):
     """Insert an admin user into the database if they don't already exist."""

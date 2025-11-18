@@ -23,6 +23,7 @@ from app.services.postgres.service import (
     list_tables_in_db,
     insert_admin_user,
     update_user_password,
+    create_favorites_and_playlists_tables
 )
 
 
@@ -96,3 +97,8 @@ def update_user_password_endpoint(
 ):
     """Updates a user's password with a new pre-hashed password."""
     return update_user_password(email, new_hashed_password)
+
+
+@router.get("/admin/create_favs_playlist_tables", response_model=StatusResponse)
+def create_favs_playlist_tables_endpoint():
+    return create_favorites_and_playlists_tables()
