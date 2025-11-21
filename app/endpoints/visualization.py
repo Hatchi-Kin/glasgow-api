@@ -28,7 +28,7 @@ def create_table_endpoint():
 
 @router.post("/load_data", response_model=StatusResponse)
 def load_data_endpoint(
-    bucket_name: str = Query(default="megaset", description="MinIO bucket name"),
+    bucket_name: str = Query(default="megaset-sqlite", description="MinIO bucket name"),
     object_name: str = Query(default="music_visualization_data.json", description="JSON file name")
 ):
     """Load visualization data from MinIO JSON file into the database."""
