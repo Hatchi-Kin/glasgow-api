@@ -14,12 +14,12 @@ logger = get_logger("visualization")
 
 
 def create_visualization_table():
-    """Create the track_visualization_umap table in PostgreSQL."""
+    """Create the track_visualization_sphere table in PostgreSQL."""
     try:
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS track_visualization_umap (
+                    CREATE TABLE IF NOT EXISTS track_visualization_sphere (
                         id INTEGER PRIMARY KEY REFERENCES megaset(id) ON DELETE CASCADE,
                         x REAL NOT NULL,
                         y REAL NOT NULL,
@@ -28,21 +28,21 @@ def create_visualization_table():
                         cluster_color VARCHAR(7) NOT NULL,
                         created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                     );
-                    CREATE INDEX IF NOT EXISTS idx_track_visualization_umap_cluster ON track_visualization_umap(cluster);
+                    CREATE INDEX IF NOT EXISTS idx_track_visualization_sphere_cluster ON track_visualization_sphere(cluster);
                 """)
                 conn.commit()
-        return {"status": "success", "message": "track_visualization table created or already exists."}
+        return {"status": "success", "message": "track_visualization_sphere table created or already exists."}
     except Exception as e:
-        logger.error(f"Failed to create track_visualization_umap table: {str(e)}")
+        logger.error(f"Failed to create track_visualization_sphere table: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create table: {str(e)}")
 
 
 def load_visualization_data_from_minio(
     bucket_name: str = "megaset-sqlite",
-    object_name: str = "umap_coordinates.json"
+    object_name: str = "spherical_umap_coordinates.json"
 ):
     """
-    Load visualization data from MinIO JSON file and populate the track_visualization_umap table.
+    Load visualization data from MinIO JSON file and populate the track_visualization_sphere table.
     """
     temp_file_path = None
     
@@ -78,13 +78,13 @@ def load_visualization_data_from_minio(
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
                 # Clear existing data
-                cursor.execute("DELETE FROM track_visualization_umap;")
+                cursor.execute("DELETE FROM track_visualization_sphere;")
                 
                 # Bulk insert
                 execute_values(
                     cursor,
                     """
-                    INSERT INTO track_visualization_umap (id, x, y, z, cluster, cluster_color)
+                    INSERT INTO track_visualization_sphere (id, x, y, z, cluster, cluster_color)
                     VALUES %s
                     ON CONFLICT (id) DO UPDATE SET
                         x = EXCLUDED.x,
@@ -130,7 +130,7 @@ def get_all_visualization_points(limit: int = 10000, offset: int = 0):
                         m.album,
                         m.genre,
                         m.year
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     ORDER BY tv.id
                     LIMIT %s OFFSET %s;
@@ -139,7 +139,7 @@ def get_all_visualization_points(limit: int = 10000, offset: int = 0):
                 rows = cursor.fetchall()
                 
                 # Get total count
-                cursor.execute("SELECT COUNT(*) as count FROM track_visualization_umap;")
+                cursor.execute("SELECT COUNT(*) as count FROM track_visualization_sphere;")
                 total = cursor.fetchone()["count"]
                 
                 points = []
@@ -176,17 +176,17 @@ def get_visualization_stats():
         with get_postgres_connection() as conn:
             with conn.cursor() as cursor:
                 # Total tracks
-                cursor.execute("SELECT COUNT(*) as count FROM track_visualization_umap;")
+                cursor.execute("SELECT COUNT(*) as count FROM track_visualization_sphere;")
                 total_tracks = cursor.fetchone()["count"]
                 
                 # Total clusters (excluding noise cluster -1)
-                cursor.execute("SELECT COUNT(DISTINCT cluster) as count FROM track_visualization_umap WHERE cluster >= 0;")
+                cursor.execute("SELECT COUNT(DISTINCT cluster) as count FROM track_visualization_sphere WHERE cluster >= 0;")
                 total_clusters = cursor.fetchone()["count"]
                 
                 # Genre distribution
                 cursor.execute("""
                     SELECT m.genre, COUNT(*) as count
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     WHERE m.genre IS NOT NULL
                     GROUP BY m.genre
@@ -205,7 +205,7 @@ def get_visualization_stats():
                         AVG(x) as center_x,
                         AVG(y) as center_y,
                         AVG(z) as center_z
-                    FROM track_visualization_umap
+                    FROM track_visualization_sphere
                     WHERE cluster >= 0
                     GROUP BY cluster, cluster_color
                     ORDER BY count DESC
@@ -255,7 +255,7 @@ def search_tracks(query: str, limit: int = 50):
                         m.album,
                         m.genre,
                         m.year
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     WHERE 
                         m.title ILIKE %s OR
@@ -270,7 +270,7 @@ def search_tracks(query: str, limit: int = 50):
                 # Get total count without limit
                 cursor.execute("""
                     SELECT COUNT(*) as count
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     WHERE 
                         m.title ILIKE %s OR
@@ -321,7 +321,7 @@ def get_cluster_details(cluster_id: int):
                         AVG(x) as center_x,
                         AVG(y) as center_y,
                         AVG(z) as center_z
-                    FROM track_visualization_umap
+                    FROM track_visualization_sphere
                     WHERE cluster = %s
                     GROUP BY cluster, cluster_color;
                 """, (cluster_id,))
@@ -351,7 +351,7 @@ def get_cluster_details(cluster_id: int):
                         m.album,
                         m.genre,
                         m.year
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     WHERE tv.cluster = %s
                     ORDER BY m.artist, m.album, m.title;
@@ -395,7 +395,7 @@ def get_track_neighbors(track_id: int, limit: int = 20):
             with conn.cursor() as cursor:
                 # Get the track's coordinates
                 cursor.execute("""
-                    SELECT x, y, z FROM track_visualization_umap WHERE id = %s;
+                    SELECT x, y, z FROM track_visualization_sphere WHERE id = %s;
                 """, (track_id,))
                 
                 track = cursor.fetchone()
@@ -419,7 +419,7 @@ def get_track_neighbors(track_id: int, limit: int = 20):
                         m.genre,
                         m.year,
                         SQRT(POWER(tv.x - %s, 2) + POWER(tv.y - %s, 2) + POWER(tv.z - %s, 2)) as distance
-                    FROM track_visualization_umap tv
+                    FROM track_visualization_sphere tv
                     JOIN megaset m ON tv.id = m.id
                     WHERE tv.id != %s
                     ORDER BY distance
