@@ -17,3 +17,5 @@ tests/
 docs/
 *.md
 .DS_Store
+.ruff_cache
+.vscode/

@@ -1,38 +1,43 @@
-FROM python:3.11-slim as builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim as builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Copy dependency files first for better caching
+COPY pyproject.toml uv.lock ./
 
-# Copy and install requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install dependencies into /app/.venv
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy application code
+COPY . .
+
+# Install the project itself
+RUN uv sync --frozen --no-dev
 
 # Production stage
-FROM python:3.11-slim
+FROM python:3.12-slim-bookworm
 
-# Create non-root user with specific UID and GID to match other containers
+# Create non-root user with specific UID and GID
 RUN groupadd -r -g 1000 appuser && useradd -r -u 1000 -g 1000 appuser
 
 WORKDIR /app
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /home/appuser/.local
+# Copy the virtual environment from builder
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 # Copy application code
-COPY app/ ./app/
+COPY --chown=appuser:appuser ./api ./api
 
-# Set ownership for the app and the user's local directory
-RUN chown -R appuser:appuser /app /home/appuser/.local
+# Switch to non-root user
 USER appuser
 
-# Add user's local bin to PATH
-ENV PATH=/home/appuser/.local/bin:$PATH
+# Add venv to PATH
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-EXPOSE 8000
+# Use a different port to avoid conflict (change as needed)
+EXPOSE 8010
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
+# Run with uvicorn
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

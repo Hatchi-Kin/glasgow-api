@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
+from app.models.postgres_requests import AdminCreateRequest, UserPasswordUpdateRequest
 
 from app.models.common import StatusResponse
 from app.models.postgres import (
@@ -23,7 +24,7 @@ from app.services.postgres.service import (
     list_tables_in_db,
     insert_admin_user,
     update_user_password,
-    create_favorites_and_playlists_tables
+    create_favorites_and_playlists_tables,
 )
 
 
@@ -81,22 +82,15 @@ def create_users_table_endpoint():
 
 
 @router.post("/admin/create-initial-admin", response_model=StatusResponse)
-def create_initial_admin_endpoint(
-    email: str = Body(..., embed=True),
-    username: str = Body(..., embed=True),
-    hashed_password: str = Body(..., embed=True),
-):
-    """Creates an initial admin user with a pre-hashed password."""
-    return insert_admin_user(email, username, hashed_password)
+def create_initial_admin_endpoint(request: AdminCreateRequest):
+    """Creates an initial admin user with a pre‑hashed password."""
+    return insert_admin_user(request.email, request.username, request.hashed_password)
 
 
 @router.post("/users/update-password", response_model=StatusResponse)
-def update_user_password_endpoint(
-    email: str = Body(..., embed=True),
-    new_hashed_password: str = Body(..., embed=True),
-):
-    """Updates a user's password with a new pre-hashed password."""
-    return update_user_password(email, new_hashed_password)
+def update_user_password_endpoint(request: UserPasswordUpdateRequest):
+    """Updates a user's password with a new pre‑hashed password."""
+    return update_user_password(request.email, request.new_hashed_password)
 
 
 @router.get("/admin/create_favs_playlist_tables", response_model=StatusResponse)

@@ -45,23 +45,23 @@
 #     Load visualization data from MinIO JSON file and populate the track_visualization table.
 #     """
 #     temp_file_path = None
-    
+
 #     try:
 #         # Download JSON file from MinIO
 #         temp_file_path = os.path.join(tempfile.gettempdir(), object_name)
 #         logger.info(f"Downloading {object_name} from {bucket_name}")
 #         download_object(bucket_name, object_name, temp_file_path)
-        
+
 #         # Load JSON data
 #         with open(temp_file_path, 'r') as f:
 #             data = json.load(f)
-        
+
 #         points = data.get('points', [])
 #         if not points:
 #             return {"status": "warning", "message": "No points found in JSON file"}
-        
+
 #         logger.info(f"Loaded {len(points)} points from JSON")
-        
+
 #         # Prepare data for bulk insert
 #         values_to_insert = []
 #         for point in points:
@@ -73,13 +73,13 @@
 #                 point['cluster'],
 #                 point['cluster_color']
 #             ))
-        
+
 #         # Bulk insert into PostgreSQL
 #         with get_postgres_connection() as conn:
 #             with conn.cursor() as cursor:
 #                 # Clear existing data
 #                 cursor.execute("DELETE FROM track_visualization;")
-                
+
 #                 # Bulk insert
 #                 execute_values(
 #                     cursor,
@@ -96,16 +96,16 @@
 #                     values_to_insert
 #                 )
 #                 conn.commit()
-        
+
 #         return {
 #             "status": "success",
 #             "message": f"Loaded {len(values_to_insert)} visualization points into database"
 #         }
-    
+
 #     except Exception as e:
 #         logger.error(f"Failed to load visualization data: {str(e)}")
 #         raise HTTPException(status_code=500, detail=f"Failed to load data: {str(e)}")
-    
+
 #     finally:
 #         # Cleanup temp file
 #         if temp_file_path and os.path.exists(temp_file_path):
@@ -118,7 +118,7 @@
 #         with get_postgres_connection() as conn:
 #             with conn.cursor() as cursor:
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         tv.id,
 #                         tv.x,
 #                         tv.y,
@@ -135,13 +135,13 @@
 #                     ORDER BY tv.id
 #                     LIMIT %s OFFSET %s;
 #                 """, (limit, offset))
-                
+
 #                 rows = cursor.fetchall()
-                
+
 #                 # Get total count
 #                 cursor.execute("SELECT COUNT(*) as count FROM track_visualization;")
 #                 total = cursor.fetchone()["count"]
-                
+
 #                 points = []
 #                 for row in rows:
 #                     points.append({
@@ -157,14 +157,14 @@
 #                         "genre": row["genre"],
 #                         "year": row["year"]
 #                     })
-                
+
 #                 return {
 #                     "points": points,
 #                     "total": total,
 #                     "limit": limit,
 #                     "offset": offset
 #                 }
-    
+
 #     except Exception as e:
 #         logger.error(f"Failed to get visualization points: {str(e)}")
 #         raise HTTPException(status_code=500, detail=f"Failed to get points: {str(e)}")
@@ -178,11 +178,11 @@
 #                 # Total tracks
 #                 cursor.execute("SELECT COUNT(*) as count FROM track_visualization;")
 #                 total_tracks = cursor.fetchone()["count"]
-                
+
 #                 # Total clusters (excluding noise cluster -1)
 #                 cursor.execute("SELECT COUNT(DISTINCT cluster) as count FROM track_visualization WHERE cluster >= 0;")
 #                 total_clusters = cursor.fetchone()["count"]
-                
+
 #                 # Genre distribution
 #                 cursor.execute("""
 #                     SELECT m.genre, COUNT(*) as count
@@ -195,10 +195,10 @@
 #                 genre_rows = cursor.fetchall()
 #                 genres = {row["genre"]: row["count"] for row in genre_rows}
 #                 top_genres = [(row["genre"], row["count"]) for row in genre_rows[:10]]
-                
+
 #                 # Largest cluster
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         cluster,
 #                         cluster_color,
 #                         COUNT(*) as count,
@@ -212,7 +212,7 @@
 #                     LIMIT 1;
 #                 """)
 #                 largest = cursor.fetchone()
-                
+
 #                 largest_cluster = None
 #                 if largest:
 #                     largest_cluster = {
@@ -221,7 +221,7 @@
 #                         "count": largest["count"],
 #                         "center": [largest["center_x"], largest["center_y"], largest["center_z"]]
 #                     }
-                
+
 #                 return {
 #                     "total_tracks": total_tracks,
 #                     "total_clusters": total_clusters,
@@ -229,7 +229,7 @@
 #                     "top_genres": top_genres,
 #                     "largest_cluster": largest_cluster
 #                 }
-    
+
 #     except Exception as e:
 #         logger.error(f"Failed to get visualization stats: {str(e)}")
 #         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
@@ -239,11 +239,11 @@
 #     """Search tracks by title, artist, album, or genre."""
 #     try:
 #         search_pattern = f"%{query}%"
-        
+
 #         with get_postgres_connection() as conn:
 #             with conn.cursor() as cursor:
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         tv.id,
 #                         tv.x,
 #                         tv.y,
@@ -257,29 +257,29 @@
 #                         m.year
 #                     FROM track_visualization tv
 #                     JOIN megaset m ON tv.id = m.id
-#                     WHERE 
+#                     WHERE
 #                         m.title ILIKE %s OR
 #                         m.artist ILIKE %s OR
 #                         m.album ILIKE %s OR
 #                         m.genre ILIKE %s
 #                     LIMIT %s;
 #                 """, (search_pattern, search_pattern, search_pattern, search_pattern, limit))
-                
+
 #                 rows = cursor.fetchall()
-                
+
 #                 # Get total count without limit
 #                 cursor.execute("""
 #                     SELECT COUNT(*) as count
 #                     FROM track_visualization tv
 #                     JOIN megaset m ON tv.id = m.id
-#                     WHERE 
+#                     WHERE
 #                         m.title ILIKE %s OR
 #                         m.artist ILIKE %s OR
 #                         m.album ILIKE %s OR
 #                         m.genre ILIKE %s;
 #                 """, (search_pattern, search_pattern, search_pattern, search_pattern))
 #                 total = cursor.fetchone()["count"]
-                
+
 #                 results = []
 #                 for row in rows:
 #                     results.append({
@@ -295,13 +295,13 @@
 #                         "genre": row["genre"],
 #                         "year": row["year"]
 #                     })
-                
+
 #                 return {
 #                     "query": query,
 #                     "results": results,
 #                     "total_results": total
 #                 }
-    
+
 #     except Exception as e:
 #         logger.error(f"Failed to search tracks: {str(e)}")
 #         raise HTTPException(status_code=500, detail=f"Failed to search: {str(e)}")
@@ -314,7 +314,7 @@
 #             with conn.cursor() as cursor:
 #                 # Get cluster info
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         cluster,
 #                         cluster_color,
 #                         COUNT(*) as count,
@@ -325,21 +325,21 @@
 #                     WHERE cluster = %s
 #                     GROUP BY cluster, cluster_color;
 #                 """, (cluster_id,))
-                
+
 #                 cluster_row = cursor.fetchone()
 #                 if not cluster_row:
 #                     raise HTTPException(status_code=404, detail=f"Cluster {cluster_id} not found")
-                
+
 #                 cluster_info = {
 #                     "id": cluster_row["cluster"],
 #                     "color": cluster_row["cluster_color"],
 #                     "count": cluster_row["count"],
 #                     "center": [cluster_row["center_x"], cluster_row["center_y"], cluster_row["center_z"]]
 #                 }
-                
+
 #                 # Get all tracks in cluster
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         tv.id,
 #                         tv.x,
 #                         tv.y,
@@ -356,7 +356,7 @@
 #                     WHERE tv.cluster = %s
 #                     ORDER BY m.artist, m.album, m.title;
 #                 """, (cluster_id,))
-                
+
 #                 rows = cursor.fetchall()
 #                 tracks = []
 #                 for row in rows:
@@ -373,14 +373,14 @@
 #                         "genre": row["genre"],
 #                         "year": row["year"]
 #                     })
-                
+
 #                 return {
 #                     "cluster_id": cluster_id,
 #                     "count": cluster_info["count"],
 #                     "tracks": tracks,
 #                     "info": cluster_info
 #                 }
-    
+
 #     except HTTPException as e:
 #         raise e
 #     except Exception as e:
@@ -397,16 +397,16 @@
 #                 cursor.execute("""
 #                     SELECT x, y, z FROM track_visualization WHERE id = %s;
 #                 """, (track_id,))
-                
+
 #                 track = cursor.fetchone()
 #                 if not track:
 #                     raise HTTPException(status_code=404, detail=f"Track {track_id} not found in visualization")
-                
+
 #                 tx, ty, tz = track["x"], track["y"], track["z"]
-                
+
 #                 # Find nearest neighbors using Euclidean distance
 #                 cursor.execute("""
-#                     SELECT 
+#                     SELECT
 #                         tv.id,
 #                         tv.x,
 #                         tv.y,
@@ -425,7 +425,7 @@
 #                     ORDER BY distance
 #                     LIMIT %s;
 #                 """, (tx, ty, tz, track_id, limit))
-                
+
 #                 rows = cursor.fetchall()
 #                 neighbors = []
 #                 for row in rows:
@@ -443,12 +443,12 @@
 #                         "year": row["year"],
 #                         "distance": float(row["distance"])
 #                     })
-                
+
 #                 return {
 #                     "track_id": track_id,
 #                     "neighbors": neighbors
 #                 }
-    
+
 #     except HTTPException as e:
 #         raise e
 #     except Exception as e:

@@ -1,7 +1,15 @@
 from fastapi import APIRouter
 
-from app.models.minio import MinIOHealthResponse, BucketCreateResponse, MinIOObjectListResponse
-from app.services.minio.service import minio_health_check, create_new_bucket, list_bucket_objects
+from app.models.minio import (
+    MinIOHealthResponse,
+    BucketCreateResponse,
+    MinIOObjectListResponse,
+)
+from app.services.minio.service import (
+    minio_health_check,
+    create_new_bucket,
+    list_bucket_objects,
+)
 
 
 router = APIRouter(prefix="/MiniO", tags=["MiniO"])

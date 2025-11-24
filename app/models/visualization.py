@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Optional
 
 
 class TrackPoint(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Single track point in 3D space."""
     id: int = Field(..., description="Track ID")
     x: float = Field(..., description="X coordinate in 3D space")
@@ -29,12 +30,13 @@ class TrackPoint(BaseModel):
                 "artist": "Logic",
                 "album": "Young Sinatra: Undeniable",
                 "genre": "Hip-Hop",
-                "year": 2010
+                "year": 2010,
             }
         }
 
 
 class ClusterInfo(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Information about a cluster."""
     id: int = Field(..., description="Cluster ID")
     color: str = Field(..., description="Hex color")
@@ -47,18 +49,20 @@ class ClusterInfo(BaseModel):
                 "id": 5,
                 "color": "#FF6B6B",
                 "count": 342,
-                "center": [0.5, -0.2, 0.8]
+                "center": [0.5, -0.2, 0.8],
             }
         }
 
 
 class VisualizationData(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Complete visualization dataset."""
     points: List[TrackPoint] = Field(..., description="All track points")
     clusters: Dict[str, ClusterInfo] = Field(..., description="Cluster metadata")
 
 
 class SearchResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Search results."""
     query: str = Field(..., description="Search query")
     results: List[TrackPoint] = Field(..., description="Matching tracks")
@@ -66,15 +70,19 @@ class SearchResponse(BaseModel):
 
 
 class StatsResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Visualization statistics."""
     total_tracks: int = Field(..., description="Total number of tracks")
     total_clusters: int = Field(..., description="Number of clusters")
     genres: Dict[str, int] = Field(..., description="Track count by genre")
     top_genres: List[tuple] = Field(..., description="Top 10 genres")
-    largest_cluster: Optional[ClusterInfo] = Field(None, description="Largest cluster info")
+    largest_cluster: Optional[ClusterInfo] = Field(
+        None, description="Largest cluster info"
+    )
 
 
 class ClusterDetail(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     """Detailed cluster information."""
     cluster_id: int = Field(..., description="Cluster ID")
     count: int = Field(..., description="Number of tracks")

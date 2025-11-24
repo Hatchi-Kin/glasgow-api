@@ -5,7 +5,7 @@ from app.models.visualization import (
     TrackPoint,
     ClusterDetail,
     SearchResponse,
-    StatsResponse
+    StatsResponse,
 )
 from app.services.visualization import (
     create_visualization_table,
@@ -14,7 +14,7 @@ from app.services.visualization import (
     get_visualization_stats,
     search_tracks,
     get_cluster_details,
-    get_track_neighbors
+    get_track_neighbors,
 )
 
 router = APIRouter(prefix="/visualization", tags=["Visualization"])
@@ -29,7 +29,9 @@ def create_table_endpoint():
 @router.post("/load_data", response_model=StatusResponse)
 def load_data_endpoint(
     bucket_name: str = Query(default="megaset-sqlite", description="MinIO bucket name"),
-    object_name: str = Query(default="music_visualization_data.json", description="JSON file name")
+    object_name: str = Query(
+        default="music_visualization_data.json", description="JSON file name"
+    ),
 ):
     """Load visualization data from MinIO JSON file into the database."""
     return load_visualization_data_from_minio(bucket_name, object_name)
@@ -37,8 +39,10 @@ def load_data_endpoint(
 
 @router.get("/points")
 def get_points_endpoint(
-    limit: int = Query(default=10000, ge=1, le=50000, description="Maximum number of points to return"),
-    offset: int = Query(default=0, ge=0, description="Offset for pagination")
+    limit: int = Query(
+        default=10000, ge=1, le=50000, description="Maximum number of points to return"
+    ),
+    offset: int = Query(default=0, ge=0, description="Offset for pagination"),
 ):
     """Get all visualization points with track metadata."""
     return get_all_visualization_points(limit, offset)
@@ -53,7 +57,7 @@ def get_stats_endpoint():
 @router.get("/search", response_model=SearchResponse)
 def search_endpoint(
     q: str = Query(..., description="Search query for title, artist, album, or genre"),
-    limit: int = Query(default=50, ge=1, le=500, description="Maximum results")
+    limit: int = Query(default=50, ge=1, le=500, description="Maximum results"),
 ):
     """Search tracks by title, artist, album, or genre."""
     return search_tracks(q, limit)
@@ -68,7 +72,7 @@ def get_cluster_endpoint(cluster_id: int):
 @router.get("/track/{track_id}/neighbors")
 def get_neighbors_endpoint(
     track_id: int,
-    limit: int = Query(default=20, ge=1, le=100, description="Number of neighbors")
+    limit: int = Query(default=20, ge=1, le=100, description="Number of neighbors"),
 ):
     """Get nearest neighbors of a track in 3D space."""
     return get_track_neighbors(track_id, limit)

@@ -79,16 +79,18 @@ def download_object(bucket_name: str, object_name: str, file_path: str):
     try:
         client = get_minio_client()
         client.fget_object(bucket_name, object_name, file_path)
-        logger.info(f"Successfully downloaded '{object_name}' from bucket '{bucket_name}' to '{file_path}'")
+        logger.info(
+            f"Successfully downloaded '{object_name}' from bucket '{bucket_name}' to '{file_path}'"
+        )
         return {"status": "success", "message": "File downloaded successfully."}
     except S3Error as e:
         logger.error(f"Failed to download object from MinIO: {e}")
         raise HTTPException(status_code=500, detail=f"MinIO S3 Error: {e}")
     except Exception as e:
         logger.error(f"An unexpected error occurred during file download: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-
-
+        raise HTTPException(
+            status_code=500, detail=f"An unexpected error occurred: {e}"
+        )
 
 
 def minio_health_check():

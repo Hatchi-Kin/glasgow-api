@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.common import HealthResponse
 
 
 class MegasetTrack(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: int
     filename: str
     filepath: str
@@ -25,12 +26,14 @@ class MegasetTrack(BaseModel):
 
 
 class MegasetResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     status: str
     count: int
     tracks: List[MegasetTrack]
 
 
 class SimilarityResult(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: int
     filename: str
     filepath: str
@@ -42,25 +45,30 @@ class SimilarityResult(BaseModel):
 
 
 class VectorSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     query_embedding: List[float]
     limit: int = 10
 
 
 class VectorSearchResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     status: str
     tracks: List[SimilarityResult]
 
 
 class DatabaseListResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     status: str
     databases: List[str]
 
 
 class TableListResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     status: str
     database: str
     tables: List[str]
 
 
 class PostgresHealthResponse(HealthResponse):
+    model_config = ConfigDict(extra="ignore")
     database: Optional[str] = Field(None, description="Database connection status")
