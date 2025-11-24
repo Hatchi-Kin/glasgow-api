@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim as builder
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 # Copy application code
-COPY --chown=appuser:appuser ./api ./api
+COPY --chown=appuser:appuser ./app ./app
 
 # Switch to non-root user
 USER appuser
