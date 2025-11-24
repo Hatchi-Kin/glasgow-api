@@ -23,6 +23,11 @@ curl http://localhost:8000/docs  # Swagger UI
 
 The application expects the environment variables defined in core/config.py
 
+## Ruff
+
+```sh
+uv run ruff check --fix
+```
 
 ## 🐳 Docker
 

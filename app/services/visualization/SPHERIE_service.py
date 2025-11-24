@@ -1,7 +1,6 @@
 import json
 import tempfile
 import os
-from typing import List, Dict, Optional
 
 from fastapi import HTTPException
 from psycopg2.extras import execute_values

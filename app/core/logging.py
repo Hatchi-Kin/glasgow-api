@@ -1,6 +1,5 @@
 import logging
 import sys
-from typing import Dict, Any
 
 from app.core.config import settings
 

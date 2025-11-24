@@ -2,7 +2,6 @@ from fastapi import APIRouter, Query
 
 from app.models.common import StatusResponse
 from app.models.visualization import (
-    TrackPoint,
     ClusterDetail,
     SearchResponse,
     StatsResponse,

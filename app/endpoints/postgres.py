@@ -52,7 +52,7 @@ def bulk_insert_512_embeddings_endpoint():
 
 
 @router.post("/megaset/search_by_512_embedding", response_model=VectorSearchResponse)
-def search_by_512_embedding_endpoint(request: VectorSearchRequest = Body(...)):
+def search_by_512_embedding_endpoint(request: VectorSearchRequest):
     return find_similar_tracks_by_512_embedding(request.query_embedding, request.limit)
 
 
