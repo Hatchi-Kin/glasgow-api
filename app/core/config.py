@@ -10,9 +10,9 @@ class Settings(BaseSettings):
     )
 
     # App settings
-    app_name: str = Field(default="Glasgow GitOps API", description="Application name")
-    app_version: str = Field(default="1.1.0", description="Application version")
-    debug: bool = Field(default=False, description="Debug mode")
+    app_name: str = "Glasgow GitOps API"
+    app_version: str = "0.1.0"
+    debug: bool = False
 
     # PostgreSQL settings
     postgres_host: str = Field(..., description="PostgreSQL host")

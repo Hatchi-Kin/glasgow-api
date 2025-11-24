@@ -3,7 +3,6 @@ from typing import List, Dict, Optional
 
 
 class TrackPoint(BaseModel):
-    model_config = ConfigDict(extra="ignore")
     """Single track point in 3D space."""
     id: int = Field(..., description="Track ID")
     x: float = Field(..., description="X coordinate in 3D space")
@@ -36,7 +35,6 @@ class TrackPoint(BaseModel):
 
 
 class ClusterInfo(BaseModel):
-    model_config = ConfigDict(extra="ignore")
     """Information about a cluster."""
     id: int = Field(..., description="Cluster ID")
     color: str = Field(..., description="Hex color")

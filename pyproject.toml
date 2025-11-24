@@ -11,7 +11,8 @@ dependencies = [
     "aiofiles>=23.2.0",
     "python-multipart>=0.0.6",
     "pydantic-settings>=2.0.0",
-    "numpy>=1.26.0"
+    "numpy>=1.26.0",
+    "pydantic[email]>=2.12.4",
 ]
 
 
