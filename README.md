@@ -1,16 +1,7 @@
 # Glasgow FastAPI 🚀
 
 A FastAPI application designed for the Glasgow GitOps learning project, featuring automated CI/CD deployment to Kubernetes via ArgoCD.
-
-## 🏗️ Architecture
-
-This application is part of a **GitOps microservices stack**:
-- **FastAPI** (this repo) - Application code
-- **PostgreSQL** - Database storage
-- **MinIO** - Object storage
-- **ArgoCD** - GitOps deployment
-- **Traefik** - Ingress controller
-
+Admin API
 
 ## 🛠️ Development
 
@@ -18,7 +9,7 @@ This application is part of a **GitOps microservices stack**:
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+uv sync
 
 # Run locally with hot reload
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -30,14 +21,8 @@ curl http://localhost:8000/docs  # Swagger UI
 
 ### Environment Variables
 
-The application expects these environment variables:
+The application expects the environment variables defined in core/config.py
 
-```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/database
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=admin
-MINIO_SECRET_KEY=password123
-```
 
 ## 🐳 Docker
 
@@ -62,17 +47,7 @@ curl http://localhost:8000/health
 ### Docker Hub Integration
 
 This repository is configured with **automated Docker Hub builds** via GitHub Actions.
-
-#### 🔄 Automated Workflow
-
-Every push to `main` triggers:
-
-1. **GitHub Actions** builds Docker image
-2. **Image pushed** to `hatchikin/glasgow-fastapi:latest`
-3. **Multiple tags** created automatically:
-   - `hatchikin/glasgow-fastapi:latest`
-   - `hatchikin/glasgow-fastapi:main`
-   - `hatchikin/glasgow-fastapi:main-abc1234` (commit SHA)
+The new images are picked up by ArgoCD and deployed.
 
 
 #### 📋 Manual Trigger
@@ -102,36 +77,9 @@ glasgow-gitops/           # Infrastructure repo
 └── argocd/apps/         # ArgoCD applications
 ```
 
-### Deployment Flow
-
-1. **Developer** pushes code changes
-2. **GitHub Actions** builds new Docker image
-3. **Image** pushed to Docker Hub with latest tag
-4. **ArgoCD** detects configuration in GitOps repo
-5. **Kubernetes** pulls new image and deploys
-
-### Kubernetes Configuration
-
-The application runs in Kubernetes with:
-- **2 replicas** (production)
-- **Resource limits**: 512Mi memory, 400m CPU
-- **Health checks**: Liveness and readiness probes
-- **Config injection**: Database and MinIO credentials via ConfigMap
-- **Ingress**: External access via `api.glasgow.local`
 
 ## 🧪 Testing
 
-### Local Testing
-```bash
-# Test health endpoints
-curl http://localhost:8000/health
-curl http://localhost:8000/health/db
-curl http://localhost:8000/health/minio
-
-# Test bucket operations
-curl -X POST http://localhost:8000/bucket/test-bucket
-curl http://localhost:8000/buckets
-```
 
 ### Kubernetes Testing
 ```bash
@@ -173,19 +121,6 @@ kubectl get svc -n minio-prod
 kubectl get configmap fastapi-config -n fastapi-prod -o yaml
 ```
 
-## 🚀 Development Workflow
-
-### Making Changes
-
-1. **Edit code** in `app/main.py`
-2. **Test locally** with `uvicorn app.main:app --reload`
-3. **Commit and push** to main branch
-4. **GitHub Actions** automatically builds and pushes new image
-5. **Restart deployment** to pull new image:
-   ```bash
-   kubectl rollout restart deployment/fastapi -n fastapi-prod
-   ```
-
 ### Version Management
 
 For production deployments, consider using specific version tags:
@@ -199,40 +134,3 @@ docker push hatchikin/glasgow-fastapi:v1.2.3
 # Edit components/fastapi/base/deployment.yaml
 image: hatchikin/glasgow-fastapi:v1.2.3
 ```
-
-## 📚 Related Documentation
-
-- **GitOps Repository**: [glasgow-gitops](https://github.com/Hatchi-Kin/glasgow-gitops)
-- **ArgoCD**: https://argo-cd.readthedocs.io/
-- **FastAPI**: https://fastapi.tiangolo.com/
-- **Docker Hub**: https://hub.docker.com/r/hatchikin/glasgow-fastapi
-
-
-
-## TODO (Future Improvements)
-
-- Docs and config alignment
-  - Align README env vars and examples with code (POSTGRES_HOST/PORT/USER/PASSWORD/DB, MINIO_*). Current README shows DATABASE_URL and some endpoints that don’t exist.
-  - Add a .env.example with required variables.
-  - Optionally support DATABASE_URL in Settings for flexibility.
-- API consistency
-  - Standardize route prefixes and casing (use "/minio" not "/MiniO"; tags like "MinIO").
-  - Use proper HTTP verbs (e.g., make /postgresql/setup_music a POST).
-  - Consider conventional /healthz and /readyz endpoints and add an API version prefix (e.g., /api/v1).
-- Security for file uploads
-  - Sanitize subfolder and filename to prevent path traversal; write only under the music folder.
-  - Validate content type/extension and restrict subfolder characters.
-  - Stream uploads to file in chunks instead of reading all into memory.
-- Observability and logging
-  - Replace custom logger-based timestamp in health with datetime.now(timezone.utc).isoformat().
-  - Remove unused imports; consider JSON logs and request-id middleware in production.
-- Dependencies and build
-  - Pin versions in requirements.txt for reproducible builds.
-  - In Dockerfile, install to system site-packages (drop --user) and copy /usr/local; set PYTHONDONTWRITEBYTECODE=1 and PYTHONUNBUFFERED=1.
-  - Add Docker HEALTHCHECK (e.g., GET /health/simple). Optionally allow UVICORN_WORKERS via env.
-- Database layer
-  - Add connect_timeout to the PostgreSQL DSN.
-  - Reuse the connection context manager in list_tables_in_db for consistency.
-- Minor polish
-  - Add FastAPI description/contact/license to improve OpenAPI docs.
-  - Optionally add CORS for local development.
